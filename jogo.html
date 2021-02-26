@@ -1,0 +1,197 @@
+<html>
+
+	<head>
+		<script language="javascript">
+			var canvas, ctx;
+			// 0 = Jogando, 10 = Pausado, 99 = Game Over
+			var estadoJogo = 0;
+			var nVezes = 0;
+			var estrelas = [];
+			var id; 
+			var d;  
+			var STARS = 100;
+			var tecla = "00";
+			var nave = { 'x':100, 'y':320, 'w':64, 'h':64, 'cor':"#0000FF", 'image':new Image(), 'hp':100 };
+			var inimigo = { 'x':200, 'y':50, 'w':64, 'h':128, 'cor':"#FF0000", 
+							'hp':5, velX:1, velY:0, 'image':new Image() };
+			var naveHP = { 'w':50, 'cheia':'#00FF00', 'media':'#FFFF00', 'baixa':'#FF0000'}
+			var listaTiros = [];
+			var tiroImage = new Image();
+			
+			function iniciar() { 	
+				nave.image.src = "./nave.png";
+				inimigo.image.src = "./inimigo.png";
+				tiroImage.src = "./shoot.png";
+				canvas = document.getElementById("gl");
+				ctx = canvas.getContext("2d");
+				id = ctx.createImageData(1,1);
+				d = id.data; 
+				
+				for (var i=0; i<STARS; i++) { 
+					var x = Math.floor(Math.random() * canvas.width); 
+					var y = Math.floor(Math.random() * canvas.height);          
+					d[0] = 255;
+					d[1] = 255;
+					d[2] = 255;
+					d[3] = 255;
+					var star = { 'x':x, 'y':y };    
+					estrelas[i] = star;
+				}
+				
+			}
+			
+			function pintarTela() {		
+				ctx.fillStyle = "#000000";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+				for (var i=0; i<STARS; i++) { 
+					var star = estrelas[i];
+					ctx.putImageData( id, star.x, star.y );  
+				}
+				
+				ctx.fillStyle = "#FFFF00";
+				ctx.font="20px Georgia";
+				ctx.fillText("Inimigo : " + inimigo.hp, 10, 50);
+				// ctx.fillText("Nave : " + nave.hp, 10, 100);
+				
+				// ctx.fillStyle = nave.cor;
+				// ctx.fillRect( nave.x, nave.y, nave.w, nave.h);
+				ctx.drawImage( nave.image, nave.x, nave.y, nave.w, nave.h );
+				
+				//ctx.fillStyle = inimigo.cor;
+				//ctx.fillRect( inimigo.x, inimigo.y, inimigo.w, inimigo.h);
+				//ctx.fillStyle = "#FFFF00";
+				//ctx.fillText(inimigo.hp, inimigo.x + 10, inimigo.y + 3);
+				ctx.drawImage( inimigo.image, inimigo.x, inimigo.y, inimigo.w, inimigo.h);
+				
+				ctx.fillStyle = "#FFFFFF";
+				for (var i = 0; i < listaTiros.length; i++) { 
+					var tiro = listaTiros[i];
+					//ctx.fillRect( tiro.x, tiro.y, tiro.w, tiro.h);
+					ctx.drawImage(tiroImage, tiro.x, tiro.y, tiro.w, tiro.h);
+				}				
+				
+				//Pintar NaveHP
+				var w = nave.hp * naveHP.w / 100;
+				var corNaveHP = naveHP.cheia;
+				if (w <= 10) { 
+					corNaveHP = naveHP.baixa;
+				} else if (w <= 30){ 
+					corNaveHP = naveHP.media;
+				}
+				ctx.fillStyle = corNaveHP;
+				ctx.fillText("Nave HP : ", 10, 100);
+				ctx.fillRect(100, 100-15, w, 15);
+				
+				
+				if (estadoJogo == 10) { 
+					ctx.fillStyle = "#FFFFFF";
+					ctx.font="48px Georgia";
+					ctx.fillText("P A U S A D O", 150, 200);
+				} else if (estadoJogo == 99) { 
+					ctx.fillStyle = "#FF0000";
+					ctx.font="48px Georgia";
+					ctx.fillText("G A M E  O V E R", 100, 200);
+				}
+			}
+			
+			function calcularRegras() { 
+				inimigo.x = inimigo.x + inimigo.velX;
+				inimigo.y = inimigo.y + inimigo.velY;
+				if (inimigo.y < 50) { 
+					inimigo.velY = 0;
+					inimigo.y = 50;
+				}
+				
+				if ( (inimigo.y + inimigo.h / 2) > nave.y) { 
+					inimigo.velY = -3;
+				}				
+				
+				if(inimigo.x > canvas.width) { 
+					inimigo.velX = -1;
+				}
+
+				if(inimigo.x < 0) { 
+					inimigo.velX = 1;
+				}				
+				
+				inimigo.pm = inimigo.x + (inimigo.w / 2);
+				nave.pm = nave.x + (nave.w / 2);
+				if (inimigo.pm == nave.pm) { 
+					inimigo.velY = 10;
+				}
+				
+				for (var i = 0; i < listaTiros.length; i++) { 
+					var tiro = listaTiros[i];
+					tiro.y = tiro.y - 1;
+					if (tiro.y < 0) { 
+						listaTiros.splice(i, 1);
+					}
+					if (intersectRect(tiro, inimigo)) { 
+						inimigo.hp = inimigo.hp - 1;
+						listaTiros.splice(i, 1);
+					}
+				}
+				
+				if (intersectRect(nave, inimigo)) { 
+					nave.hp = nave.hp - 1;
+				}
+				
+				if (nave.hp <= 0) { 
+					estadoJogo = 99;
+				}
+			}
+			
+			function capturaEventos( e ) { 
+				var key = e.which;
+				tecla = key;
+				if(estadoJogo == 0 && key == "37") {
+					nave.x = nave.x - 5;
+				} else if (estadoJogo == 0 && key == "39") {
+					nave.x = nave.x + 5;
+				} else if (estadoJogo == 0 && key == "32") {
+					if ( listaTiros.length < 5) {
+						var tiro = { 'x': nave.x + 30, 'y':nave.y, 'w':8, 'h':8 }
+						listaTiros.push( tiro );
+					}
+				} else if ( (estadoJogo != 99 ) && (key == "80" || key == "112") ) {
+					if (estadoJogo == 0) { 
+						estadoJogo = 10;
+					} else { 
+						estadoJogo = 0;
+					}
+				}
+			}
+			
+			function intersectRect(r1, r2) {
+				  return !(r2.x > r1.x + r1.w || 
+						   r2.x + r2.w < r1.x || 
+						   r2.y > r1.y + r1.h ||
+						   r2.y + r2.h < r1.y);
+			}
+			
+			function jogo() { 
+				if (estadoJogo == 0) {
+					calcularRegras();
+					pintarTela();
+					capturarEventos();
+				} else if (estadoJogo == 10) {
+					pintarTela();
+					capturarEventos();
+				} else if (estadoJogo == 99) {
+					pintarTela();
+				}
+			}
+		</script>
+	</head>
+	<body onload="iniciar();">
+		<canvas id="gl" width="600" height="400">
+		</canvas>
+	</body>
+	
+	<script>
+		window.addEventListener( "keydown", capturaEventos, false);
+		var game = setInterval(jogo, 1);
+	</script>
+
+</html>
